@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Trimmer</title>
+    <script>
+        async function trimVideo() {
+            const url = document.getElementById("videoUrl").value;
+            const start = document.getElementById("startTime").value;
+            const end = document.getElementById("endTime").value;
+    
+            console.log("Sending request to /trim with:", url, start, end);
+    
+            try {
+                const response = await fetch('/trim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, start, end })
+                });
+    
+                const result = await response.json();
+                console.log("Response from /trim:", result);
+    
+                if (response.ok) {
+                    console.log("Redirecting to /watch...");
+                    window.location.href = "/watch";
+                } else {
+                    document.getElementById("response").innerText = "Error: " + (result.error || "Unknown error");
+                }
+            } catch (error) {
+                console.error("Fetch error:", error);
+                document.getElementById("response").innerText = "Request failed";
+            }
+        }
+    </script>
+    
+</head>
+<body>
+    <p>This page has been visited {{ count }} times.</p>
+
+    <h2>Video Editor</h2>
+    
+    <label>Video URL:</label>
+    <input type="text" id="videoUrl" placeholder="Enter video URL"><br><br>
+    
+    <label>Start Time (HH:MM:SS):</label>
+    <input type="text" id="startTime" placeholder="00:00:30"><br><br>
+    
+    <label>End Time (HH:MM:SS):</label>
+    <input type="text" id="endTime" placeholder="00:01:00"><br><br>
+    
+    <button onclick="trimVideo()">Trim Video</button>
+    <pre id="response"></pre>
+
+</body>
+</html>
