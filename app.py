@@ -3,7 +3,7 @@ import redis
 import os
 import subprocess
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,render_template,send_from_directory
 
 app = Flask(__name__)
 cache = redis.Redis(host='redis', port=6379)
@@ -22,25 +22,36 @@ def get_hit_count():
 @app.route('/')
 def hello():
     count = get_hit_count()
-    return f'Hello from Docker! I have been seen {count} times.\n'
+    return render_template('index.html', count=count)
+
 
 
 
 def save_file(file_path):
-    """
-    Saves the processed file to the root folder of the project.
-    """
-    project_root = os.getcwd()
+    save_directory = "/app/videos/"  # Define a fixed directory inside the container
+    os.makedirs(save_directory, exist_ok=True)  # Ensure the folder exists
 
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+    saved_path = os.path.join(save_directory, os.path.basename(file_path))
+    os.rename(file_path, saved_path)  # Move the file
 
-   
-    os.makedirs(project_root, exist_ok=True)
+    print(f"✅ File saved to: {saved_path}")  # Debugging log
+    return saved_path
 
-    saved_path = os.path.join(project_root, os.path.basename(file_path))
-    os.rename(file_path, saved_path)
-    return saved_path  
+
+@app.route('/video/<filename>')
+def serve_video(filename):
+    video_directory = "/app/videos/"  
+
+    video_path = os.path.join(video_directory, filename)
+    if not os.path.exists(video_path):
+        return "File not found", 404
+
+    print(f"📢 Serving video from: {video_path}")  
+    return send_from_directory(video_directory, filename)
+
+@app.route('/watch')
+def watch_video():
+        return render_template("watch.html")
 
 
 '''
@@ -84,12 +95,20 @@ def trim_video():
         ]
         
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if os.path.exists(temp_input):
+            os.remove(temp_input)
+
         if result.returncode != 0:
             return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
-        
-        saved_path = save_file(temp_output)  
-        return jsonify({"message": "Processing complete", "saved_path": saved_path}), 200
+
+        save_file(temp_output)  # Save the file in the project root
+
+        # Return the video URL to be displayed on the webpage
+        return jsonify({"message": "Processing complete", "redirect_url": "/watch"}), 200
     
+
+
     except Exception as e:
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
     finally:
