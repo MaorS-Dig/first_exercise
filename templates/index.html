@@ -3,55 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Trimmer</title>
+    <title>Video Processor</title>
     <script>
-        async function trimVideo() {
-            const url = document.getElementById("videoUrl").value;
-            const start = document.getElementById("startTime").value;
-            const end = document.getElementById("endTime").value;
-    
-            console.log("Sending request to /trim with:", url, start, end);
-    
-            try {
-                const response = await fetch('/trim', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, start, end })
-                });
-    
-                const result = await response.json();
-                console.log("Response from /trim:", result);
-    
-                if (response.ok) {
-                    console.log("Redirecting to /watch...");
-                    window.location.href = "/watch";
+        function updateForm() {
+            const action = document.getElementById("action").value;
+            document.getElementById("video_section").style.display = action === "trim" ? "block" : "none";
+            document.getElementById("audio_section").style.display = action === "extract_audio" ? "block" : "none";
+        }
+
+        async function processVideo() {
+            const action = document.getElementById("action").value;
+            const url = document.getElementById("video_url").value;
+            const start = document.getElementById("start_time").value;
+            const end = document.getElementById("end_time").value;
+
+            const endpoint = action === "trim" ? "/trim" : "/extract_audio";
+
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, start, end })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                if (action === "trim") {
+                    document.getElementById("video_player").src = data.video_url;
+                    document.getElementById("video_player").style.display = "block";
                 } else {
-                    document.getElementById("response").innerText = "Error: " + (result.error || "Unknown error");
+                    document.getElementById("audio_player").src = data.audio_url;
+                    document.getElementById("audio_player").style.display = "block";
                 }
-            } catch (error) {
-                console.error("Fetch error:", error);
-                document.getElementById("response").innerText = "Request failed";
+            } else {
+                alert("Error: " + data.error);
             }
         }
     </script>
-    
 </head>
 <body>
     <p>This page has been visited {{ count }} times.</p>
 
-    <h2>Video Editor</h2>
-    
-    <label>Video URL:</label>
-    <input type="text" id="videoUrl" placeholder="Enter video URL"><br><br>
-    
-    <label>Start Time (HH:MM:SS):</label>
-    <input type="text" id="startTime" placeholder="00:00:30"><br><br>
-    
-    <label>End Time (HH:MM:SS):</label>
-    <input type="text" id="endTime" placeholder="00:01:00"><br><br>
-    
-    <button onclick="trimVideo()">Trim Video</button>
-    <pre id="response"></pre>
+    <h2>Video Processor</h2>
 
+    <label>Choose Action:</label>
+    <select id="action" onchange="updateForm()">
+        <option value="trim">Trim Video</option>
+        <option value="extract_audio">Extract Audio</option>
+    </select><br>
+
+    <label>Video URL:</label>
+    <input type="text" id="video_url" placeholder="Enter video URL"><br>
+
+    <label>Start Time:</label>
+    <input type="text" id="start_time" placeholder="HH:MM:SS"><br>
+
+    <label>End Time:</label>
+    <input type="text" id="end_time" placeholder="HH:MM:SS"><br>
+
+    <button onclick="processVideo()">Process</button>
+
+    <h3 id="video_section">Trimmed Video:</h3>
+    <video id="video_player" controls style="display: none;"></video>
+
+    <h3 id="audio_section" style="display: none;">Extracted Audio:</h3>
+    <audio id="audio_player" controls style="display: none;"></audio>
 </body>
 </html>
