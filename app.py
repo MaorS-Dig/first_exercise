@@ -111,3 +111,60 @@ def trim_video():
 
     except Exception as e:
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
+    finally:
+        if os.path.exists(temp_input):
+            os.remove(temp_input)
+
+
+'''
+In order to trim a video making a POST request with an mp4 Public file and start+end times is needed.
+Can use curl -X POST http://127.0.0.1:8000/extract_audio \
+     -H "Content-Type: application/json" \
+     -d '{
+           "url": "your_video_file.mp4",
+           "start": "00:00:30",
+           "end": "00:01:00"
+         }'
+'''
+@app.route('/extract_audio', methods=['POST'])
+def extract_audio():
+    data = request.json
+    url = data.get('url')
+    start = data.get('start')  # Format: HH:MM:SS or seconds
+    end = data.get('end')  # Format: HH:MM:SS or seconds
+
+    if not url or start is None or end is None:
+        return jsonify({"error": "Missing parameters (url, start, end)"}), 400
+
+    temp_input = "temp_input.mp4"
+    temp_output = "temp_output_audio.mp3"
+
+    try:
+        response = requests.get(url, stream=True)
+        if response.status_code != 200:
+            return jsonify({"error": "Failed to fetch video from URL"}), 400
+
+        with open(temp_input, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024):
+                f.write(chunk)
+
+        command = [
+            "ffmpeg", "-i", temp_input,
+            "-ss", str(start), "-to", str(end),
+            "-q:a", "0", "-map", "a", temp_output
+        ]
+
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
+
+        saved_path = save_file(temp_output)  
+
+        return jsonify({"message": "Processing complete", "saved_path": saved_path}), 200
+
+    except Exception as e:
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
+    finally:
+        if os.path.exists(temp_input):
+            os.remove(temp_input)
