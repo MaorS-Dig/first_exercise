@@ -29,12 +29,12 @@ def hello():
 
 def save_file(file_path):
     save_directory = "/app/videos/"  # Define a fixed directory inside the container
-    os.makedirs(save_directory, exist_ok=True)  # Ensure the folder exists
+    os.makedirs(save_directory, exist_ok=True)  
 
     saved_path = os.path.join(save_directory, os.path.basename(file_path))
-    os.rename(file_path, saved_path)  # Move the file
+    os.rename(file_path, saved_path)  
 
-    print(f"✅ File saved to: {saved_path}")  # Debugging log
+    print(f"✅ File saved to: {saved_path}")  
     return saved_path
 
 
@@ -102,7 +102,7 @@ def trim_video():
         if result.returncode != 0:
             return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
 
-        save_file(temp_output)  # Save the file in the project root
+        save_file(temp_output)  
 
         # Return the video URL to be displayed on the webpage
         return jsonify({"message": "Processing complete", "redirect_url": "/watch"}), 200
@@ -133,38 +133,37 @@ def extract_audio():
     start = data.get('start')  # Format: HH:MM:SS or seconds
     end = data.get('end')  # Format: HH:MM:SS or seconds
 
+    
     if not url or start is None or end is None:
-        return jsonify({"error": "Missing parameters (url, start, end)"}), 400
+        return jsonify({"error": "Missing parameters (url, start, end, format)"}), 400
+
+    response = requests.get(url, stream=True)
+    if response.status_code != 200:
+        return jsonify({"error": "Failed to fetch video from URL"}), 400
 
     temp_input = "temp_input.mp4"
-    temp_output = "temp_output_audio.mp3"
+    temp_output = f"extracted_audio.mp3"  
+    
+    with open(temp_input, "wb") as f:
+        for chunk in response.iter_content(chunk_size=1024):
+            f.write(chunk)
 
-    try:
-        response = requests.get(url, stream=True)
-        if response.status_code != 200:
-            return jsonify({"error": "Failed to fetch video from URL"}), 400
+    command = [
+        "ffmpeg", "-i", temp_input,
+        "-ss", str(start), "-to", str(end),
+        "-q:a", "0", "-map", "a", temp_output
+    ]
 
-        with open(temp_input, "wb") as f:
-            for chunk in response.iter_content(chunk_size=1024):
-                f.write(chunk)
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        command = [
-            "ffmpeg", "-i", temp_input,
-            "-ss", str(start), "-to", str(end),
-            "-q:a", "0", "-map", "a", temp_output
-        ]
+    if os.path.exists(temp_input):
+        os.remove(temp_input)
 
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode != 0:
-            return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
+    if result.returncode != 0:
+        return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
 
-        saved_path = save_file(temp_output)  
+    saved_audio_path = save_file(temp_output)  
 
-        return jsonify({"message": "Processing complete", "saved_path": saved_path}), 200
-
-    except Exception as e:
-        return jsonify({"error": "An error occurred", "details": str(e)}), 500
-
-    finally:
-        if os.path.exists(temp_input):
-            os.remove(temp_input)
+    # Return the audio URL for frontend
+    audio_url = f"/video/{os.path.basename(saved_audio_path)}"
+    return jsonify({"message": "Processing complete", "audio_url": audio_url}), 200
