@@ -4,6 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Processor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+        }
+        input, select, button {
+            margin: 10px;
+            padding: 10px;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .loading {
+            display: none;
+            font-size: 18px;
+            color: #007bff;
+        }
+        video, audio {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 500px;
+        }
+    </style>
     <script>
         function updateForm() {
             const action = document.getElementById("action").value;
@@ -16,57 +58,71 @@
             const url = document.getElementById("video_url").value;
             const start = document.getElementById("start_time").value;
             const end = document.getElementById("end_time").value;
-
+            const loadingIndicator = document.getElementById("loading");
+            const processButton = document.getElementById("process_button");
+            
+            loadingIndicator.style.display = "block";
+            processButton.style.display = "none";
+            
             const endpoint = action === "trim" ? "/trim" : "/extract_audio";
-
             const response = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url, start, end })
             });
-
+            
             const data = await response.json();
-
+            loadingIndicator.style.display = "none";
+            
             if (response.ok) {
                 if (action === "trim") {
-                    document.getElementById("video_player").src = data.video_url;
+                    document.getElementById("video_player").src = `/video/${data.video_filename}`;
                     document.getElementById("video_player").style.display = "block";
                 } else {
-                    document.getElementById("audio_player").src = data.audio_url;
+                    if (action === "extract_audio") {
+                    document.getElementById("audio_player").src = data.audio_url;  // Use `audio_url` instead of `audio_filename`
                     document.getElementById("audio_player").style.display = "block";
+                    }
                 }
             } else {
                 alert("Error: " + data.error);
             }
+            processButton.style.display = "block";
         }
     </script>
 </head>
 <body>
-    <p>This page has been visited {{ count }} times.</p>
+    <div class="container">
+        <p>This page has been visited {{ count }} times.</p>
+        <h2>Video Processor</h2>
 
-    <h2>Video Processor</h2>
+        <label>Choose Action:</label>
+        <select id="action" onchange="updateForm()">
+            <option value="trim">Trim Video</option>
+            <option value="extract_audio">Extract Audio</option>
+        </select><br>
 
-    <label>Choose Action:</label>
-    <select id="action" onchange="updateForm()">
-        <option value="trim">Trim Video</option>
-        <option value="extract_audio">Extract Audio</option>
-    </select><br>
+        <label>Video URL:</label>
+        <input type="text" id="video_url" placeholder="Enter video URL"><br>
 
-    <label>Video URL:</label>
-    <input type="text" id="video_url" placeholder="Enter video URL"><br>
+        <label>Start Time:</label>
+        <input type="text" id="start_time" placeholder="HH:MM:SS"><br>
 
-    <label>Start Time:</label>
-    <input type="text" id="start_time" placeholder="HH:MM:SS"><br>
+        <label>End Time:</label>
+        <input type="text" id="end_time" placeholder="HH:MM:SS"><br>
 
-    <label>End Time:</label>
-    <input type="text" id="end_time" placeholder="HH:MM:SS"><br>
+        <button id="process_button" onclick="processVideo()">Process</button>
+        <p id="loading" class="loading">Processing, please wait...</p>
 
-    <button onclick="processVideo()">Process</button>
+        <div id="video_section">
+            <h3>Trimmed Video:</h3>
+            <video id="video_player" controls style="display: none;"></video>
+        </div>
 
-    <h3 id="video_section">Trimmed Video:</h3>
-    <video id="video_player" controls style="display: none;"></video>
-
-    <h3 id="audio_section" style="display: none;">Extracted Audio:</h3>
-    <audio id="audio_player" controls style="display: none;"></audio>
+        <div id="audio_section" style="display: none;">
+            <h3>Extracted Audio:</h3>
+            <audio id="audio_player" controls style="display: none;"></audio>
+        </div>
+    </div>
 </body>
 </html>
