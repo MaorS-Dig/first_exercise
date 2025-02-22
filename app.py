@@ -49,9 +49,7 @@ def serve_video(filename):
     print(f"📢 Serving video from: {video_path}")  
     return send_from_directory(video_directory, filename)
 
-@app.route('/watch')
-def watch_video():
-        return render_template("watch.html")
+
 
 
 '''
@@ -68,32 +66,30 @@ Can use curl -X POST http://127.0.0.1:8000/trim \
 def trim_video():
     data = request.json
     url = data.get('url')
-    start = data.get('start')  # Format: HH:MM:SS or seconds
-    end = data.get('end')  # Format: HH:MM:SS or seconds
-    
+    start = data.get('start')
+    end = data.get('end')
+
     if not url or start is None or end is None:
         return jsonify({"error": "Missing parameters (url, start, end)"}), 400
-    
+
     try:
         response = requests.get(url, stream=True)
         if response.status_code != 200:
             return jsonify({"error": "Failed to fetch video from URL"}), 400
-        
+
         temp_input = "temp_input.mp4"
-        temp_output = "temp_output_trimmed.mp4"
-        
-        
+        temp_output = "output_video.mp4"  # Ensure a fixed output name
+
         with open(temp_input, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
                 f.write(chunk)
-        
-        
+
         command = [
             "ffmpeg", "-i", temp_input,
             "-ss", str(start), "-to", str(end),
             "-c", "copy", temp_output
         ]
-        
+
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if os.path.exists(temp_input):
@@ -102,10 +98,14 @@ def trim_video():
         if result.returncode != 0:
             return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
 
-        save_file(temp_output)  
+        save_file(temp_output)  # Ensure this function saves in the right location
 
-        # Return the video URL to be displayed on the webpage
-        return jsonify({"message": "Processing complete", "redirect_url": "/watch"}), 200
+        # Correctly return the video filename for the frontend
+        return jsonify({"video_filename": "output_video.mp4"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
     
 
 
