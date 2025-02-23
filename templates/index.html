@@ -48,47 +48,51 @@
     </style>
     <script>
         function updateForm() {
-            const action = document.getElementById("action").value;
-            document.getElementById("video_section").style.display = action === "trim" ? "block" : "none";
-            document.getElementById("audio_section").style.display = action === "extract_audio" ? "block" : "none";
-        }
+        const action = document.getElementById("action").value;
+        document.getElementById("video_section").style.display = action === "trim" ? "block" : "none";
+        document.getElementById("audio_section").style.display = action === "extract_audio" ? "block" : "none";
+    }
 
-        async function processVideo() {
-            const action = document.getElementById("action").value;
-            const url = document.getElementById("video_url").value;
-            const start = document.getElementById("start_time").value;
-            const end = document.getElementById("end_time").value;
-            const loadingIndicator = document.getElementById("loading");
-            const processButton = document.getElementById("process_button");
-            
-            loadingIndicator.style.display = "block";
-            processButton.style.display = "none";
-            
-            const endpoint = action === "trim" ? "/trim" : "/extract_audio";
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, start, end })
-            });
-            
+    async function processVideo() {
+        const action = document.getElementById("action").value;
+        const url = document.getElementById("video_url").value;
+        const start = document.getElementById("start_time").value;
+        const end = document.getElementById("end_time").value;
+        const loadingIndicator = document.getElementById("loading");
+        const processButton = document.getElementById("process_button");
+        
+        loadingIndicator.style.display = "block";
+        processButton.style.display = "none";
+
+        const requestData = {
+            url,
+            start,
+            end
+        };
+
+        const endpoint = action === "trim" ? "/trim" : "/extract_audio";
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestData)
+        });
+
+        if (response.ok) {
             const data = await response.json();
             loadingIndicator.style.display = "none";
-            
-            if (response.ok) {
-                if (action === "trim") {
-                    document.getElementById("video_player").src = `/video/${data.video_filename}`;
-                    document.getElementById("video_player").style.display = "block";
-                } else {
-                    if (action === "extract_audio") {
-                    document.getElementById("audio_player").src = data.audio_url;  // Use `audio_url` instead of `audio_filename`
-                    document.getElementById("audio_player").style.display = "block";
-                    }
-                }
-            } else {
-                alert("Error: " + data.error);
-            }
+            processButton.style.display = "block";
+
+            // Redirect to the respective page based on the output data
+            const fileType = action === "trim" ? "video" : "audio";
+            window.location.href = `/process/${fileType}?${fileType}_filename=${data[`${fileType}_filename`]}`;
+        } else {
+            alert("Error: " + await response.text());
+            loadingIndicator.style.display = "none";
             processButton.style.display = "block";
         }
+    }
+
+        
     </script>
 </head>
 <body>
