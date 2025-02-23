@@ -32,6 +32,7 @@ def save_file(file_path):
     saved_path = os.path.join(save_directory, os.path.basename(file_path))
     os.rename(file_path, saved_path) 
 
+
     print(f"✅ File saved to: {saved_path}")  
     return file_path
 
@@ -50,6 +51,7 @@ def serve_video(filename):
 
 @app.route('/process', methods=['POST'])
 def process_file():
+
     data = request.json
     action = data.get('action')
     url = data.get('url')
@@ -74,6 +76,7 @@ def process_file():
         elif action == "extract_audio":
             temp_output = "extracted_audio.mp3"  # Output name for audio extraction
 
+
         # Save the fetched video
         with open(temp_input, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
@@ -92,6 +95,7 @@ def process_file():
                 "-ss", str(start), "-to", str(end),
                 "-q:a", "0", "-map", "a", temp_output
             ]
+
 
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -112,8 +116,10 @@ def process_file():
         elif action == "extract_audio":
             return jsonify({"audio_filename": os.path.basename(saved_file_path)})
 
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/trim_video/<video_filename>')
