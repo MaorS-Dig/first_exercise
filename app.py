@@ -30,7 +30,8 @@ def save_file(file_path):
     os.makedirs(save_directory, exist_ok=True)  
 
     saved_path = os.path.join(save_directory, os.path.basename(file_path))
-    os.rename(file_path, saved_path)  
+    os.rename(file_path, saved_path) 
+
 
     print(f"✅ File saved to: {saved_path}")  
     return file_path
@@ -48,15 +49,20 @@ def serve_video(filename):
     return send_from_directory(video_directory, filename)
 
 
-@app.route('/trim', methods=['POST'])
-def trim_video():
+@app.route('/process', methods=['POST'])
+def process_file():
+
     data = request.json
+    action = data.get('action')
     url = data.get('url')
     start = data.get('start')
     end = data.get('end')
 
-    if not url or start is None or end is None:
-        return jsonify({"error": "Missing parameters (url, start, end)"}), 400
+    if not action or not url or start is None or end is None:
+        return jsonify({"error": "Missing parameters (action, url, start, end)"}), 400
+
+    if action not in ['trim', 'extract_audio']:
+        return jsonify({"error": "Invalid action type"}), 400
 
     try:
         # Fetch the video
@@ -65,19 +71,31 @@ def trim_video():
             return jsonify({"error": "Failed to fetch video from URL"}), 400
 
         temp_input = "temp_input.mp4"
-        temp_output = "output_video.mp4"  # Fixed output name
+        if action == "trim":
+            temp_output = "output_video.mp4"  # Fixed output name for trimming
+        elif action == "extract_audio":
+            temp_output = "extracted_audio.mp3"  # Output name for audio extraction
+
 
         # Save the fetched video
         with open(temp_input, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
                 f.write(chunk)
 
-        # Run ffmpeg to trim the video
-        command = [
-            "ffmpeg", "-i", temp_input,
-            "-ss", str(start), "-to", str(end),
-            "-c", "copy", temp_output
-        ]
+        # Run ffmpeg based on the action type
+        if action == "trim":
+            command = [
+                "ffmpeg", "-i", temp_input,
+                "-ss", str(start), "-to", str(end),
+                "-c", "copy", temp_output
+            ]
+        elif action == "extract_audio":
+            command = [
+                "ffmpeg", "-i", temp_input,
+                "-ss", str(start), "-to", str(end),
+                "-q:a", "0", "-map", "a", temp_output
+            ]
+
 
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -89,75 +107,26 @@ def trim_video():
         if result.returncode != 0:
             return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
 
-        # Save the video to the desired directory
-        saved_video_path = save_file(temp_output)
+        # Save the video or audio to the desired directory
+        saved_file_path = save_file(temp_output)
 
-        # Redirect to the page that will show the video
-        return jsonify({"video_filename": os.path.basename(saved_video_path)})
+        # Return the result with the filename
+        if action == "trim":
+            return jsonify({"video_filename": os.path.basename(saved_file_path)})
+        elif action == "extract_audio":
+            return jsonify({"audio_filename": os.path.basename(saved_file_path)})
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/extract_audio', methods=['POST'])
-def extract_audio():
-    data = request.json
-    url = data.get('url')
-    start = data.get('start')  # Format: HH:MM:SS or seconds
-    end = data.get('end')  # Format: HH:MM:SS or seconds
-
-    if not url or start is None or end is None:
-        return jsonify({"error": "Missing parameters (url, start, end)"}), 400
-
-    try:
-        # Fetch the video file
-        response = requests.get(url, stream=True)
-        if response.status_code != 200:
-            return jsonify({"error": "Failed to fetch video from URL"}), 400
-
-        temp_input = "temp_input.mp4"
-        temp_output = f"extracted_audio.mp3"  # Output audio file name
-
-        # Save the fetched video file
-        with open(temp_input, "wb") as f:
-            for chunk in response.iter_content(chunk_size=1024):
-                f.write(chunk)
-
-        # Extract audio from the video
-        command = [
-            "ffmpeg", "-i", temp_input,
-            "-ss", str(start), "-to", str(end),
-            "-q:a", "0", "-map", "a", temp_output
-        ]
-
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Clean up temporary video input file
-        if os.path.exists(temp_input):
-            os.remove(temp_input)
-
-        if result.returncode != 0:
-            return jsonify({"error": "FFmpeg processing failed", "details": result.stderr.decode()}), 500
-
-        # Save the audio to the desired directory
-        saved_audio_path = save_file(temp_output)
-
-        # Redirect to the page that will show the extracted audio
-        return jsonify({"audio_filename": os.path.basename(saved_audio_path)})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/process/<file_type>', methods=['GET'])
-def process_page(file_type):
-    filename = request.args.get(f'{file_type}_filename')
-    if not filename:
-        return "File not found", 404
 
-    # Serve video/audio based on the file_type
-    if file_type == "video":
-        return render_template('trim_video.html', video_filename=filename)
-    elif file_type == "audio":
-        return render_template('extract_audio.html', audio_filename=filename)
-    else:
-        return "Invalid file type", 400
+
+@app.route('/trim_video/<video_filename>')
+def trim_video_page(video_filename):
+    return render_template('trim_video.html', video_filename=video_filename)
+
+
+@app.route('/extract_audio/<audio_filename>')
+def extract_audio_page(audio_filename):
+    return render_template('extract_audio.html', audio_filename=audio_filename)

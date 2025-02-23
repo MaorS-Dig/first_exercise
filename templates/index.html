@@ -60,18 +60,18 @@
         const end = document.getElementById("end_time").value;
         const loadingIndicator = document.getElementById("loading");
         const processButton = document.getElementById("process_button");
-        
+
         loadingIndicator.style.display = "block";
         processButton.style.display = "none";
 
-        const requestData = {
-            url,
-            start,
-            end
+        const requestData = { 
+            action, 
+            url, 
+            start, 
+            end 
         };
 
-        const endpoint = action === "trim" ? "/trim" : "/extract_audio";
-        const response = await fetch(endpoint, {
+        const response = await fetch('/process', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(requestData)
@@ -82,9 +82,11 @@
             loadingIndicator.style.display = "none";
             processButton.style.display = "block";
 
-            // Redirect to the respective page based on the output data
-            const fileType = action === "trim" ? "video" : "audio";
-            window.location.href = `/process/${fileType}?${fileType}_filename=${data[`${fileType}_filename`]}`;
+            if (action === "trim") {
+                window.location.href = `/trim_video/${data.video_filename}`;
+            } else if (action === "extract_audio") {
+                window.location.href = `/extract_audio/${data.audio_filename}`;
+            }
         } else {
             alert("Error: " + await response.text());
             loadingIndicator.style.display = "none";
@@ -92,7 +94,6 @@
         }
     }
 
-        
     </script>
 </head>
 <body>
